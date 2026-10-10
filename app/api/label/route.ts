@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cacheGet, cacheKey, cacheSet } from "@/lib/server/cache";
 import { lookupLabel } from "@/lib/server/label";
-import type { LabelResponse, MedQuery } from "@/lib/types";
+import type { Country, LabelResponse, MedQuery } from "@/lib/types";
 
 export const maxDuration = 60;
 
@@ -17,18 +17,28 @@ export async function POST(req: Request) {
   const query: MedQuery = { name: str(body.name), strength: str(body.strength, 60), form: str(body.form, 60) };
   const ndc = str(body.ndc, 20);
   if (ndc) query.ndc = ndc;
+  const brand = str(body.brand);
+  if (brand) query.brand = brand;
+  const nafdac = str(body.nafdac, 20);
+  if (nafdac) query.nafdac = nafdac;
+  const country: Country = body.country === "US" ? "US" : "NG";
+  const productId = Number.isInteger(body.productId) && (body.productId as number) > 0 ? (body.productId as number) : undefined;
   const lang = ["en", "es", "fr"].includes(str(body.language)) ? str(body.language) : "en";
   if (query.name.length < 2) {
     return NextResponse.json<LabelResponse>({ status: "error", message: "Please enter the medicine name." }, { status: 400 });
   }
 
   // Cache by drug name so repeated lookups do not spend free-tier model quota.
-  const key = cacheKey([lang, query.name, query.strength, query.form]);
+  // A NAFDAC product is cached by its Greenbook id; everything else by name, strength and form.
+  const key =
+    country === "NG"
+      ? cacheKey(productId ? [lang, "ng", String(productId)] : [lang, "ng", query.name, query.strength, query.form])
+      : cacheKey([lang, query.name, query.strength, query.form]);
   const cached = await cacheGet(key);
   if (cached) return NextResponse.json<LabelResponse>({ status: "ok", result: { ...cached, query }, cached: true });
 
   try {
-    const out = await lookupLabel(query, lang);
+    const out = await lookupLabel(query, lang, country, productId);
     // Only cache plain-language results; label-wording fallbacks get retried later.
     if (out.status === "ok" && out.result.plainLanguage) await cacheSet(key, out.result);
     return NextResponse.json<LabelResponse>(out);

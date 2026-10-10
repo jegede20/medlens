@@ -9,11 +9,12 @@ import { ResultView } from "@/components/ResultView";
 import { AmberNote, PharmacistBar, ReadAloud, Spinner, Tag, TopBar } from "@/components/ui";
 import { readMedicine } from "@/lib/ocr";
 import { getAppData, medicineKey, saveMedicine, useAppData } from "@/lib/store";
-import type { ExtractedMedicine, LabelResponse, MedQuery } from "@/lib/types";
+import type { ExtractedMedicine, LabelResponse, MedQuery, NafdacProduct } from "@/lib/types";
 
-type Step = "capture" | "confirm" | "result";
+type Step = "capture" | "confirm" | "pick" | "result";
 type Fields = MedQuery;
-const EMPTY: Fields = { name: "", strength: "", form: "" };
+type Picks = "loading" | "error" | NafdacProduct[];
+const EMPTY: Fields = { name: "", strength: "", form: "", brand: "", nafdac: "" };
 
 export default function ScanPage() {
   return (
@@ -25,7 +26,8 @@ export default function ScanPage() {
 
 function Scan() {
   const params = useSearchParams();
-  const { medicines } = useAppData();
+  const { medicines, settings } = useAppData();
+  const nigeria = settings.country === "NG";
   const [step, setStep] = useState<Step>("capture");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,8 @@ function Scan() {
   const [method, setMethod] = useState<ExtractedMedicine["method"] | null>(null);
   const [lowConfidence, setLowConfidence] = useState(false);
   const [lookup, setLookup] = useState<LabelResponse | "loading" | null>(null);
+  const [picks, setPicks] = useState<Picks>("loading");
+  const [product, setProduct] = useState<NafdacProduct | undefined>();
   const [showCheck, setShowCheck] = useState(false);
   const [saved, setSaved] = useState(false);
   const photoRef = useRef<string | null>(null);
@@ -63,7 +67,7 @@ function Scan() {
     try {
       const r = await readMedicine(file);
       if (!r.name && !r.strength) setError("We could not read the box clearly. Type the name and strength from the box, or go back and scan the barcode.");
-      toConfirm({ name: r.name, strength: r.strength, form: r.form }, r.method, r.lowConfidence);
+      toConfirm({ name: r.name, strength: r.strength, form: r.form, brand: r.brand ?? "", nafdac: r.nafdac ?? "" }, r.method, r.lowConfidence);
     } catch (e) {
       setError((e as Error).message || "We could not read that photo. Type the details below, or try again.");
       toConfirm(EMPTY, "ocr", true);
@@ -88,16 +92,36 @@ function Scan() {
     }
   };
 
+  // Nigeria: find the pack in the NAFDAC Greenbook first. An exact NAFDAC number match skips the choice.
   const confirm = async () => {
+    if (!nigeria) return showResult();
+    setPicks("loading");
+    go("pick");
+    try {
+      const params = new URLSearchParams({ name: fields.name, strength: fields.strength, form: fields.form, brand: fields.brand ?? "", nafdac: fields.nafdac ?? "" });
+      const res = await fetch(`/api/nafdac?${params}`);
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { exact: NafdacProduct | null; candidates: NafdacProduct[] };
+      if (data.exact) return showResult(data.exact);
+      if (!data.candidates.length) return showResult();
+      setPicks(data.candidates);
+    } catch {
+      setPicks("error");
+    }
+  };
+
+  const showResult = async (product?: NafdacProduct) => {
+    setProduct(product);
     setLookup("loading");
     setShowCheck(false);
     setSaved(false);
     go("result");
+    const { language, country } = getAppData().settings;
     try {
       const res = await fetch("/api/label", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fields, language: getAppData().settings.language }),
+        body: JSON.stringify({ ...fields, nafdac: product?.nrn ?? fields.nafdac, productId: product?.id, country, language }),
       });
       setLookup((await res.json()) as LabelResponse);
     } catch {
@@ -154,12 +178,14 @@ function Scan() {
   }
 
   if (step === "confirm") {
-    const fieldDefs: { key: keyof Fields; label: string; placeholder: string; warn?: boolean }[] = [
+    const fieldDefs: { key: keyof Fields; label: string; placeholder: string; warn?: boolean; optional?: boolean }[] = [
       { key: "name", label: "Medicine name", placeholder: "For example: Paracetamol" },
+      ...(nigeria ? [{ key: "brand" as const, label: "Brand name (if shown)", placeholder: "For example: Emzor Paracetamol", optional: true }] : []),
       { key: "strength", label: "Strength", placeholder: "For example: 500 mg", warn: true },
       { key: "form", label: "Form", placeholder: "For example: Tablets" },
+      ...(nigeria ? [{ key: "nafdac" as const, label: "NAFDAC Reg. No. (if shown)", placeholder: "For example: 04-0411", optional: true }] : []),
     ];
-    const spoken = `Medicine name: ${fields.name || "not filled in"}. Strength: ${fields.strength || "not filled in"}. Form: ${fields.form || "not filled in"}.`;
+    const spoken = fieldDefs.map((f) => `${f.label}: ${fields[f.key] || "not filled in"}.`).join(" ");
     return (
       <div className="mx-auto max-w-[540px]">
         <TopBar title="Confirm details" step={2} onBack={restart} />
@@ -202,12 +228,12 @@ function Scan() {
           {fieldDefs.map((f) => {
             const original = found[f.key] ?? "";
             const value = fields[f.key] ?? "";
-            const tag = original && value === original ? "Found on box" : value ? "Edited by you" : "Please type it";
+            const tag = original && value === original ? "Found on box" : value ? "Edited by you" : f.optional ? "Optional" : "Please type it";
             return (
               <div key={f.key}>
                 <div className="mb-1.5 flex items-center justify-between gap-2">
                   <label htmlFor={`f-${f.key}`} className="text-[0.9rem] font-bold text-muted">{f.label}</label>
-                  <Tag tone={tag === "Found on box" ? "mint" : tag === "Edited by you" ? "grey" : "amber"}>{method === "barcode" && tag === "Found on box" ? "From barcode" : tag}</Tag>
+                  <Tag tone={tag === "Found on box" ? "mint" : tag === "Please type it" ? "amber" : "grey"}>{method === "barcode" && tag === "Found on box" ? "From barcode" : tag}</Tag>
                 </div>
                 <div className="relative">
                   <input
@@ -241,6 +267,54 @@ function Scan() {
     );
   }
 
+  if (step === "pick") {
+    return (
+      <div className="mx-auto max-w-[540px]">
+        <TopBar title="Find your product" step={2} onBack={() => go("confirm")} />
+        {picks === "loading" ? (
+          <Spinner label="Checking the NAFDAC Greenbook…" />
+        ) : picks === "error" ? (
+          <section className="card p-6 text-center">
+            <h2 className="text-[1.3rem] font-bold text-teal">We could not reach the NAFDAC Greenbook</h2>
+            <p className="mt-2 text-muted">You can try again, or see the US label for the same active ingredient instead.</p>
+            <div className="mt-5 flex flex-col gap-3">
+              <button type="button" onClick={confirm} className="btn glass-teal">Try again</button>
+              <button type="button" onClick={() => showResult()} className="btn btn-outline">Use the US label</button>
+            </div>
+          </section>
+        ) : (
+          <>
+            <h2 className="text-[clamp(1.5rem,2vw+1rem,1.9rem)] font-bold leading-tight text-teal">Which one is your pack?</h2>
+            <p className="mt-1 text-muted">These are registered with NAFDAC. Match the name, company and strength on your pack.</p>
+            <ul className="mt-5 space-y-3">
+              {picks.map((p) => (
+                <li key={p.id}>
+                  <button type="button" onClick={() => showResult(p)} className="card flex w-full items-start gap-3 p-4 text-left transition hover:border-teal">
+                    <span className="flex-1">
+                      <span className="block text-[1.1rem] font-bold leading-snug text-teal">{p.name}</span>
+                      <span className="block">{[p.strength, p.form].filter(Boolean).join(" · ")}</span>
+                      <span className="block text-[0.9rem] text-muted">{p.applicant}</span>
+                      <span className="mt-2 flex flex-wrap gap-2">
+                        <Tag tone="grey">Reg. No. {p.nrn}</Tag>
+                        <Tag tone={p.status === "Active" ? "mint" : "amber"}>{p.status === "Active" ? "Registered" : `Registration ${p.status.toLowerCase()}`}</Tag>
+                        {!p.hasSmpc && <Tag tone="grey">No leaflet on file</Tag>}
+                      </span>
+                    </span>
+                    <Icon name="chevron" className="mt-1 text-teal" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => showResult()} className="btn btn-outline mt-4 min-h-14 w-full">My pack is not listed</button>
+          </>
+        )}
+        <div className="mt-6">
+          <AmberNote>MedLens explains labels. Ask your doctor or pharmacist for any medical decision.</AmberNote>
+        </div>
+      </div>
+    );
+  }
+
   // Result
   const result = lookup && lookup !== "loading" && lookup.status === "ok" ? lookup.result : null;
   const others = result ? medicines.map((m) => m.result).filter((r) => medicineKey(r) !== medicineKey(result)) : [];
@@ -262,7 +336,7 @@ function Scan() {
             <p className="mt-2 text-muted">{lookup.message}</p>
             <div className="mt-5 flex flex-col gap-3">
               {lookup.status === "error" && (
-                <button type="button" onClick={confirm} className="btn glass-teal">Try again</button>
+                <button type="button" onClick={() => showResult(product)} className="btn glass-teal">Try again</button>
               )}
               <button type="button" onClick={() => go("confirm")} className="btn btn-outline">
                 <Icon name="pencil" /> Edit the details

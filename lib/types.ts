@@ -2,11 +2,32 @@
 
 export type SideEffectLevel = "common" | "rare" | "listed" | "stop";
 
+export type Country = "NG" | "US";
+
 export interface MedQuery {
   name: string;
   strength: string;
   form: string;
   ndc?: string;
+  /** Brand name printed on the pack, e.g. "Emzor Paracetamol". */
+  brand?: string;
+  /** NAFDAC registration number printed on Nigerian packs, e.g. "04-0411". */
+  nafdac?: string;
+}
+
+/** A product registered with NAFDAC, from the public Greenbook register. */
+export interface NafdacProduct {
+  id: number;
+  name: string;
+  ingredients: string;
+  strength: string;
+  form: string;
+  nrn: string;
+  applicant: string;
+  status: string;
+  expires?: string;
+  hasSmpc: boolean;
+  url: string;
 }
 
 export interface MedResult {
@@ -25,7 +46,11 @@ export interface MedResult {
   /** true when the plain-language rewrite ran; false means the label's own words are shown. */
   plainLanguage: boolean;
   language: string;
-  source: { name: "openFDA" | "DailyMed"; url: string; updated?: string };
+  source: { name: "openFDA" | "DailyMed" | "NAFDAC"; url: string; updated?: string };
+  /** NAFDAC registration of the product the user picked (Nigeria). */
+  registration?: NafdacProduct;
+  /** true when a Nigerian product is explained with the US label of the same active ingredient(s). */
+  foreignLabel?: boolean;
   /** Raw label excerpts kept for on-device interaction checks and spoken questions. */
   labelText: { warnings: string; full: string };
 }
@@ -39,6 +64,8 @@ export interface ExtractedMedicine {
   name: string;
   strength: string;
   form: string;
+  brand?: string;
+  nafdac?: string;
   method: "vision" | "ocr" | "barcode";
   lowConfidence?: boolean;
 }
@@ -61,6 +88,7 @@ export interface Settings {
   highContrast: boolean;
   voiceRate: number;
   language: string;
+  country: Country;
 }
 
 export interface Profile {

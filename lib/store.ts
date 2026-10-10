@@ -9,7 +9,7 @@ import type { AppData, MedResult, Profile, SavedMedicine, Settings } from "./typ
 export const STORAGE_KEY = "medlens:v1";
 
 export const DEFAULT_DATA: AppData = {
-  settings: { textSize: 2, voiceMode: true, highContrast: false, voiceRate: 0.9, language: "en" },
+  settings: { textSize: 2, voiceMode: true, highContrast: false, voiceRate: 0.9, language: "en", country: "NG" },
   profile: { allergies: [], goals: [] },
   medicines: [],
 };
@@ -91,7 +91,7 @@ export function updateProfile(patch: Partial<Profile>) {
 }
 
 export function medicineKey(r: MedResult) {
-  return `${r.query.name}|${r.query.strength}|${r.query.form}`.toLowerCase().replace(/\s+/g, " ").trim();
+  return `${r.registration?.nrn ?? ""}|${r.query.name}|${r.query.strength}|${r.query.form}`.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 export function saveMedicine(result: MedResult): SavedMedicine {

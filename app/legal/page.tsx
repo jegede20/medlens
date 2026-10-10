@@ -19,8 +19,9 @@ const SECTIONS = [
     id: "data",
     title: "How label data is used",
     body: [
-      "After you confirm a medicine's name, strength and form, MedLens normalizes the name with RxNorm (US National Library of Medicine) and fetches the official label from openFDA, or DailyMed if openFDA has no match.",
-      "A language model (run on Groq, free tier) may rewrite that label text in plain words. It is told to use only the label text and to say \"Not found on the label\" when the label does not cover something. Numbers in dosing are checked against the label; if they do not match, the label's own words are shown instead.",
+      "In Nigeria, after you confirm a medicine's details, MedLens looks it up in the NAFDAC Greenbook, the public register of products approved by NAFDAC, and you pick your exact pack. The explanation comes from that product's NAFDAC-approved Summary of Product Characteristics (SmPC). MedLens also shows the registration status from the Greenbook. This helps you check a pack, but it cannot prove that a pack is genuine.",
+      "If NAFDAC has no product information on file, or you choose the United States in Settings, MedLens normalizes the name with RxNorm (US National Library of Medicine) and fetches the official US label from openFDA, or DailyMed if openFDA has no match. For a Nigerian pack, directions from a US label are never shown, because they can differ.",
+      "A language model (run on Groq, free tier) may rewrite that official text in plain words. It is told to use only that text and to say \"Not found on the label\" when the label does not cover something. Numbers in dosing are checked against the label; if they do not match, the label's own words are shown instead.",
       "These sources are US-focused. Medicines sold elsewhere, herbal products and supplements may not be found. When that happens, MedLens says so and asks you to see your pharmacist.",
       "Label summaries (never personal data) are cached by drug name to keep the service free and fast. Product barcodes are looked up in Open Food Facts.",
     ],

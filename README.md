@@ -28,7 +28,14 @@ Deploy: push to GitHub, import into Vercel (free), add the same env vars.
 ## How it works
 
 `photo → /api/extract (Groq vision, else Tesseract in the browser) → confirm step (user must confirm name/strength)
-→ /api/label: cache → RxNorm normalize → openFDA label (DailyMed fallback) → Groq rewrite using only that label text → result`
+→ Nigeria: /api/nafdac finds the pack in the NAFDAC Greenbook (exact by NAFDAC Reg. No., else the user picks)
+→ /api/label: cache → NAFDAC-approved SmPC PDF (Nigeria) or RxNorm → openFDA (DailyMed fallback) → Groq rewrite using only that text → result`
+
+- Nigeria (default country, change it in Settings): products come from the public NAFDAC Greenbook
+  (greenbook.nafdac.gov.ng). Most drug records link an approved SmPC PDF; section 4 (indications, posology,
+  contraindications, warnings, interactions, pregnancy, driving, undesirable effects, overdose) is extracted with
+  `unpdf`. The result shows the registration status (Active / Inactive) with a link to the Greenbook record. With no SmPC,
+  the US label for the same active ingredient(s) is used, clearly marked, and US directions are never shown.
 
 - The model only sees the fetched label text and must answer "Not found on the label." for gaps. Every number in the
   rewritten dosing has to appear in the label's dosing text, otherwise the label's own words are shown.

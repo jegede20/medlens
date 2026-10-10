@@ -127,8 +127,10 @@ const obj = (properties: Record<string, unknown>) => ({
 export const medicinePhotoSchema = obj({
   readable: { type: "boolean" },
   name: S,
+  brand: S,
   strength: S,
   form: S,
+  nafdacNumber: S,
   confidence: { type: "string", enum: ["high", "medium", "low"] },
 });
 
@@ -150,7 +152,9 @@ export const MEDICINE_PHOTO_PROMPT = `You read photos of medicine packages.
 Copy only what is printed on the package. Never guess or fill in from memory.
 - name: the active ingredient name(s) exactly as printed (for example "Paracetamol"). If no active ingredient is printed, use the brand name.
 - strength: the strength exactly as printed, with its unit (for example "500 mg" or "125 mg/5 ml"). Copy digits carefully; 5 mg and 50 mg are different.
+- brand: the brand or product name as printed (for example "Emzor Paracetamol" or "Lonart"), or an empty string.
 - form: the dosage form as printed (for example "Tablets", "Capsules", "Syrup").
+- nafdacNumber: the NAFDAC registration number exactly as printed after "NAFDAC Reg. No." or "NRN" (for example "04-0411" or "A4-7579"), or an empty string.
 - If a field is not visible, return an empty string for it.
 - readable: false if the photo is not a medicine package or is too blurry to read.
 - confidence: how sure you are that name and strength are read correctly.`;
@@ -168,13 +172,13 @@ export function rewritePrompt(language: string) {
 STRICT RULES:
 1. Use ONLY the label text the user gives you. Never add facts from memory or general knowledge.
 2. If the label does not cover a section, return exactly one item: "${NOT_FOUND}" (for oneLine return that same text).
-3. Dosing: only restate what the label says. Keep every number, unit, age group and time gap exactly as written. Never calculate, convert, add up or suggest a dose. Never tell the reader what dose is right for them.
+3. Dosing: only restate what the label says. Keep every number, unit, age group and time gap exactly as written. Keep each age or weight group as its own item with its own dose; never merge groups or write a range such as "two or three tablets" that the label does not use. Never calculate, convert, add up or suggest a dose. Never tell the reader what dose is right for them.
 4. Use short sentences and everyday words (reading age about 11). Explain medical words simply.
 5. oneLine: one short sentence saying what the medicine is used for, from the label.
 6. sideEffects level: "common" or "rare" only if the label states how often; "stop" for signs the label says mean stop using it or ask a doctor; otherwise "listed".
 7. interactions: only from drug interaction text, "do not use" text and "ask a doctor or pharmacist before use if you are taking" text. Give each item a short title such as "Blood thinners".
 8. getHelp: only signs the label says need urgent help, emergency care, poison control, or stopping right away (for example allergic reactions or overdose).
-9. Limits: whatFor up to 4 items, howToTake up to 6, sideEffects up to 6, interactions up to 5, getHelp up to 5.
+9. Limits: whatFor up to 4 items, howToTake up to 8, sideEffects up to 6, interactions up to 5, getHelp up to 5.
 10. Write all text in ${language}.`;
 }
 

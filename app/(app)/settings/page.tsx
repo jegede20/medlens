@@ -76,7 +76,24 @@ export default function SettingsPage() {
       </section>
 
       <section className="card p-5" aria-labelledby="lang-title">
-        <h2 id="lang-title" className="text-[1.25rem] font-semibold text-teal">Language</h2>
+        <h2 id="lang-title" className="text-[1.25rem] font-semibold text-teal">Country and language</h2>
+        <label className="mt-3 flex min-h-12 items-center justify-between gap-3">
+          <span>
+            <span className="block font-bold">Where you buy your medicines</span>
+            <span className="block text-[0.88rem] text-muted">Nigeria uses the NAFDAC register; the US uses FDA labels</span>
+          </span>
+          <span className="relative">
+            <select
+              value={settings.country}
+              onChange={(e) => updateSettings({ country: e.target.value === "US" ? "US" : "NG" })}
+              className="field min-w-36 appearance-none rounded-full pr-10 font-bold"
+            >
+              <option value="NG">Nigeria</option>
+              <option value="US">United States</option>
+            </select>
+            <Icon name="chevron" size={18} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 rotate-90 text-teal" />
+          </span>
+        </label>
         <label className="mt-3 flex min-h-12 items-center justify-between gap-3">
           <span>
             <span className="block font-bold">Result and voice language</span>

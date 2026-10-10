@@ -57,10 +57,10 @@ function titleCase(s: string) {
 
 export async function readMedicine(file: Blob): Promise<ExtractedMedicine> {
   const { canvas, base64 } = await prepareImage(file);
-  type V = { readable: boolean; name: string; strength: string; form: string; confidence: string };
+  type V = { readable: boolean; name: string; brand: string; strength: string; form: string; nafdacNumber: string; confidence: string };
   const v = await vision<V>(base64, "medicine");
   if (v && v.readable && (v.name || v.strength)) {
-    return { name: v.name, strength: v.strength, form: v.form, method: "vision", lowConfidence: v.confidence !== "high" };
+    return { name: v.name, brand: v.brand, strength: v.strength, form: v.form, nafdac: v.nafdacNumber, method: "vision", lowConfidence: v.confidence !== "high" };
   }
 
   const { text, lines } = await tesseract(canvas);
@@ -73,7 +73,10 @@ export async function readMedicine(file: Blob): Promise<ExtractedMedicine> {
     .filter((l) => l.text.length >= 4 && l.conf > 40 && !/tablet|capsule|keep|reach|children|pharmac|store/i.test(l.text))
     .sort((a, b) => b.h - a.h);
   const name = candidates[0]?.text.split(" ").slice(0, 3).join(" ") ?? "";
+  // Nigerian packs print "NAFDAC Reg. No. 04-0411" (letters like A4- or B4- are part of the number).
+  const nafdac = text.match(/(?:NAFDAC|NRN)[^A-Z0-9]{0,20}(?:REG(?:ISTRATION)?\.?\s*)?(?:NO\.?|NUMBER)?\s*[:.]?\s*([A-Z]?\d{1,2}\s?-\s?\d{3,6})/i)?.[1];
   return {
+    nafdac: nafdac?.replace(/\s/g, "").toUpperCase() ?? "",
     name: name ? titleCase(name) : "",
     strength: strength ? strength[0].replace(/\s*(mg|mcg|ml|g|iu)/i, (m) => " " + m.trim().toLowerCase()) : "",
     form: form ? titleCase(form) : "",

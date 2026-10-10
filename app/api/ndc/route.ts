@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const candidates = ndcCandidates(code);
   if (!candidates.length) {
     return NextResponse.json(
-      { error: "This does not look like a US medicine barcode. Take a photo of the box instead." },
+      { error: "Barcodes only work for US medicines. For Nigerian packs, take a photo of the box or type the name and NAFDAC number." },
       { status: 400 },
     );
   }

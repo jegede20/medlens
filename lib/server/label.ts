@@ -1,14 +1,15 @@
 // Pipeline after the user confirms a medicine:
-// normalize name (RxNorm) -> fetch official label (openFDA, then DailyMed) -> plain-language rewrite -> result.
-// The model only ever receives the fetched label text. Nothing is answered from memory.
+// Nigeria: NAFDAC Greenbook product -> its approved SmPC (PDF). US, or no SmPC: RxNorm -> openFDA -> DailyMed.
+// Then a plain-language rewrite. The model only ever receives the fetched official text; nothing comes from memory.
 
-import type { LabelResponse, MedQuery, MedResult, SideEffectLevel } from "../types";
+import type { Country, LabelResponse, MedQuery, MedResult, NafdacProduct, SideEffectLevel } from "../types";
 import { generateJson, llmAvailable, LlmUnavailableError, NOT_FOUND, rewritePrompt, rewriteSchema } from "./llm";
+import { getNafdacProduct, ingredientList, smpcSections } from "./nafdac";
 
 type SectionKey =
   | "purpose" | "indications" | "dosage" | "boxedWarning" | "warnings" | "doNotUse" | "askDoctor" | "whenUsing"
   | "stopUse" | "contraindications" | "adverseReactions" | "interactions" | "overdose" | "pregnancy" | "patientInfo";
-type Sections = Partial<Record<SectionKey, string>>;
+export type Sections = Partial<Record<SectionKey, string>>;
 
 interface FoundLabel {
   sections: Sections;
@@ -315,6 +316,40 @@ async function findDailyMedLabel(q: MedQuery, rx: RxMatch | null): Promise<Found
   };
 }
 
+// ---------------- NAFDAC (Nigeria) ----------------
+
+async function findNafdacLabel(product: NafdacProduct, smpcUrl: string): Promise<FoundLabel | null> {
+  const sections = await smpcSections(smpcUrl);
+  if (!sections.indications && !sections.dosage && !sections.patientInfo) return null;
+  return {
+    sections,
+    matchedName: [product.name, product.strength].filter(Boolean).join(" · "),
+    genericNames: ingredientList(product.ingredients),
+    brandNames: [product.name.toLowerCase()],
+    pharmClasses: [],
+    source: { name: "NAFDAC", url: smpcUrl },
+  };
+}
+
+/** US label lookup, openFDA first, then DailyMed. */
+async function findUsLabel(q: MedQuery): Promise<FoundLabel | null> {
+  const rx = await rxnormNormalize(q);
+  try {
+    const label = await findFdaLabel(q, rx);
+    if (label) return label;
+  } catch {
+    /* openFDA down or rate limited: try DailyMed */
+  }
+  try {
+    return await findDailyMedLabel(q, rx);
+  } catch {
+    return null;
+  }
+}
+
+// Shown instead of US dosing for a Nigerian pack: strengths and directions can differ between countries.
+const FOREIGN_DOSING = "Directions can differ between countries and products. Follow the leaflet in your pack, or ask your pharmacist.";
+
 // ---------------- building the result ----------------
 
 // Characters of each section sent to the model, in priority order. The total (~10K characters, ~2.5K tokens)
@@ -326,9 +361,11 @@ const MODEL_BUDGET: [SectionKey, number][] = [
 ];
 
 function labelForModel(s: Sections) {
-  return MODEL_BUDGET.filter(([k]) => s[k])
+  const text = MODEL_BUDGET.filter(([k]) => s[k])
     .map(([k, max]) => `## ${SECTION_TITLES[k]}\n${cap(k === "dosage" ? summaryPart(s[k] as string) : (s[k] as string), max)}`)
     .join("\n\n");
+  // Documents without standard sections (e.g. a patient leaflet) are sent as one block of the same size.
+  return text.length < 1500 && s.patientInfo ? `${text}\n\n## Product information\n${cap(s.patientInfo, 9000)}` : text;
 }
 
 /** Label wording only, used when the plain-language rewrite is unavailable. */
@@ -373,36 +410,52 @@ function labelWordingResult(s: Sections) {
 type Rewrite = ReturnType<typeof labelWordingResult>;
 
 /** Every number in the rewritten dosing must appear in the label's own dosing text. */
+const NUMBER_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
+const NUMBER_WORD_RE = new RegExp(`\\b(${NUMBER_WORDS.join("|")})\\b`, "gi");
+
 function dosingNumbersMatch(lines: string[], dosage: string) {
-  const nums = (t: string) => (t.replace(/(\d),(\d{3})/g, "$1$2").match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+  // Labels often spell numbers out ("six doses of two tablets"), so words count the same as digits.
+  const nums = (t: string) =>
+    (t.replace(NUMBER_WORD_RE, (w) => String(NUMBER_WORDS.indexOf(w.toLowerCase()))).replace(/(\d),(\d{3})/g, "$1$2").match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
   const labelNums = new Set(nums(dosage));
   return lines.every((l) => nums(l).every((n) => labelNums.has(n)));
 }
 
 const nonEmpty = (a: unknown) => Array.isArray(a) && a.length > 0;
 
-export async function lookupLabel(q: MedQuery, lang: string): Promise<LabelResponse> {
-  const rx = await rxnormNormalize(q);
+export async function lookupLabel(q: MedQuery, lang: string, country: Country = "US", productId?: number): Promise<LabelResponse> {
   let label: FoundLabel | null = null;
-  try {
-    label = await findFdaLabel(q, rx);
-  } catch {
-    label = null; // openFDA down or rate limited: try DailyMed
-  }
-  if (!label) {
-    try {
-      label = await findDailyMedLabel(q, rx);
-    } catch {
-      label = null;
+  let registration: NafdacProduct | undefined;
+  let foreignLabel = false;
+
+  if (country === "NG") {
+    if (productId && q.nafdac) {
+      const found = await getNafdacProduct(q.nafdac, productId).catch(() => null);
+      registration = found?.product;
+      if (found?.smpcUrl) label = await findNafdacLabel(found.product, found.smpcUrl).catch(() => null);
     }
+    if (!label) {
+      // No NAFDAC document: explain the same active ingredient(s) from the US label, clearly marked.
+      const name = registration ? ingredientList(registration.ingredients).join(" and ") : q.name;
+      label = await findUsLabel({ ...q, name: name || q.name, strength: registration?.strength ?? q.strength });
+      foreignLabel = Boolean(label);
+    }
+  } else {
+    label = await findUsLabel(q);
   }
+
   if (!label) {
     return {
       status: "not_found",
-      message: `We could not find an official label for "${q.name}". This often happens with medicines sold outside the US, herbal products and supplements. Please ask your pharmacist.`,
+      message:
+        country === "NG"
+          ? `We could not find official information for "${q.name}" from NAFDAC or the US label databases. This often happens with herbal products and supplements. Please ask your pharmacist.`
+          : `We could not find an official label for "${q.name}". This often happens with medicines sold outside the US, herbal products and supplements. Please ask your pharmacist.`,
     };
   }
 
+  // US dosing must never be shown, summarised or used to answer questions for a Nigerian pack.
+  if (foreignLabel) delete label.sections.dosage;
   const s = label.sections;
   const fallback = labelWordingResult(s);
   let content: Rewrite = fallback;
@@ -414,7 +467,7 @@ export async function lookupLabel(q: MedQuery, lang: string): Promise<LabelRespo
       const out = await generateJson<Rewrite>({
         name: "label_summary",
         system: rewritePrompt(LANGUAGES[lang] ?? "English"),
-        text: `Medicine: ${label.matchedName}\n\nOFFICIAL LABEL TEXT:\n${labelForModel(s)}`,
+        text: `Medicine: ${label.matchedName}\n\n${label.source.name === "NAFDAC" ? "OFFICIAL PRODUCT INFORMATION (NAFDAC-approved SmPC)" : "OFFICIAL LABEL TEXT"}:\n${labelForModel(s)}`,
         schema: rewriteSchema,
         maxTokens: 1400,
       });
@@ -457,9 +510,12 @@ export async function lookupLabel(q: MedQuery, lang: string): Promise<LabelRespo
     brandNames: label.brandNames,
     pharmClasses: label.pharmClasses,
     ...content,
+    howToTake: foreignLabel ? [FOREIGN_DOSING] : content.howToTake,
     plainLanguage,
     language: plainLanguage ? lang : "en",
     source: label.source,
+    ...(registration ? { registration } : {}),
+    ...(foreignLabel ? { foreignLabel } : {}),
     labelText: { warnings: cap(warnings, 9000), full: cap(full, 14000) },
   };
   return { status: "ok", result, notice };

@@ -5,7 +5,7 @@ import { Icon, type IconName } from "./Icon";
 import { AmberNote, IconTile, PharmacistBar, ReadAloud, Tag } from "./ui";
 import { getAppData } from "@/lib/store";
 import { listenOnce, speak, useSpeechSupport } from "@/lib/speech";
-import type { MedResult } from "@/lib/types";
+import type { MedResult, NafdacProduct } from "@/lib/types";
 
 const NOT_FOUND = "Not found on the label.";
 const LEVEL: Record<string, { label: string; tone: "mint" | "grey" | "amber" }> = {
@@ -20,6 +20,8 @@ export const medTitle = (r: MedResult) => `${r.query.name}${r.query.strength ? "
 export function summaryText(r: MedResult) {
   return [
     `${medTitle(r)}.`,
+    r.registration ? registrationSpeech(r.registration) : "",
+    r.foreignLabel ? "This explains the US label for the same active ingredient. Follow the leaflet in your pack." : "",
     `In one line: ${r.oneLine}`,
     `What it is for: ${r.whatFor.join(" ")}`,
     `How the label says to take it: ${r.howToTake.join(" ")} This is label wording only.`,
@@ -27,7 +29,52 @@ export function summaryText(r: MedResult) {
     `Interactions to know about: ${r.interactions.map((i) => `${i.title}. ${i.text}`).join(" ")} This is not a complete interaction check.`,
     `Get help right away if: ${r.getHelp.join(" ")}`,
     "Ask your doctor or pharmacist before any medical decision.",
-  ].join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+const isActive = (reg: NafdacProduct) => reg.status === "Active";
+
+function registrationSpeech(reg: NafdacProduct) {
+  return isActive(reg)
+    ? `Registered with NAFDAC as ${reg.name}${reg.applicant ? ` by ${reg.applicant}` : ""}, number ${reg.nrn}. Check that this matches your pack.`
+    : `The NAFDAC Greenbook lists this registration as ${reg.status.toLowerCase()}. Ask your pharmacist before using this pack.`;
+}
+
+/** NAFDAC registration check for Nigerian packs: helps people spot unregistered or lapsed products. */
+function RegistrationCard({ reg }: { reg: NafdacProduct }) {
+  const active = isActive(reg);
+  return (
+    <section
+      className={`rounded-[24px] border p-5 ${active ? "border-mint-5 bg-white text-ink" : "border-amber-soft bg-caution text-caution-ink"}`}
+      aria-labelledby="reg-title"
+    >
+      <div className="flex items-center gap-3">
+        <IconTile icon={active ? "check" : "warning"} tone={active ? "mint" : "amber"} size="sm" />
+        <h2 id="reg-title" className={`flex-1 text-[1.15rem] font-semibold leading-tight ${active ? "text-teal" : ""}`}>
+          {active ? "Registered with NAFDAC" : "NAFDAC registration not active"}
+        </h2>
+        <Tag tone={active ? "mint" : "amber"}>{reg.status}</Tag>
+      </div>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[0.95rem]">
+        <dt className="text-muted">Product</dt>
+        <dd className="font-bold">{[reg.name, reg.strength].filter(Boolean).join(" · ")}</dd>
+        <dt className="text-muted">Company</dt>
+        <dd>{reg.applicant || "Not listed"}</dd>
+        <dt className="text-muted">Reg. No.</dt>
+        <dd className="font-bold tracking-wide">{reg.nrn}</dd>
+      </dl>
+      <p className="mt-3 text-[0.92rem]">
+        {active
+          ? "Check that the name, company and number match your pack. If they do not, the pack may not be genuine. Ask your pharmacist."
+          : "Ask your pharmacist before using this pack."}{" "}
+        <a href={reg.url} target="_blank" rel="noreferrer" className="font-bold text-teal underline">
+          Check on the NAFDAC Greenbook
+        </a>
+      </p>
+    </section>
+  );
 }
 
 function Section({ id, icon, tone = "mint", title, speakText, children }: { id: string; icon: IconName; tone?: "mint" | "amber" | "red"; title: string; speakText: string; children: React.ReactNode }) {
@@ -83,9 +130,20 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
             <p className="text-white/85">{[result.query.form, "Confirmed by you"].filter(Boolean).join(" · ")}</p>
           </div>
         </div>
-        <p className="relative mt-3 text-[0.88rem] text-white/85">Matched label: {result.matchedName}</p>
+        <p className="relative mt-3 text-[0.88rem] text-white/85">
+          {result.source.name === "NAFDAC" ? "Matched product" : "Matched label"}: {result.matchedName}
+        </p>
         <ReadAloud id="summary" text={whole} label="Read the whole summary aloud" wide tone="onTeal" className="relative mt-4 w-full" />
       </div>
+
+      {result.registration && <RegistrationCard reg={result.registration} />}
+
+      {result.foreignLabel && (
+        <AmberNote icon="warning">
+          We could not find NAFDAC product information for this pack, so this explains the US label for the same active
+          ingredient. Directions are not shown because they can differ. Follow the leaflet in your pack.
+        </AmberNote>
+      )}
 
       {notice && (
         <p className="flex gap-2 rounded-2xl bg-[#F1F3F2] px-4 py-3 text-[0.92rem] text-muted">
@@ -169,12 +227,24 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
       {children}
 
       <p className="px-2 text-center text-[0.85rem] text-muted">
-        Source: official label from {result.source.name}
-        {result.source.updated ? ` (updated ${result.source.updated})` : ""}.{" "}
-        <a href={result.source.url} target="_blank" rel="noreferrer" className="font-bold text-teal underline">
-          View full label
-        </a>
-        . This is a US label for the same medicine; your box may differ, so always follow your own box.
+        {result.source.name === "NAFDAC" ? (
+          <>
+            Source: NAFDAC-approved product information (SmPC) from the NAFDAC Greenbook.{" "}
+            <a href={result.source.url} target="_blank" rel="noreferrer" className="font-bold text-teal underline">
+              View the document
+            </a>
+            . Always follow the leaflet in your pack.
+          </>
+        ) : (
+          <>
+            Source: official US label from {result.source.name}
+            {result.source.updated ? ` (updated ${result.source.updated})` : ""}.{" "}
+            <a href={result.source.url} target="_blank" rel="noreferrer" className="font-bold text-teal underline">
+              View full label
+            </a>
+            . {result.foreignLabel ? "It is for the same active ingredient, not your exact pack" : "Your box may differ"}, so always follow your own pack.
+          </>
+        )}
       </p>
 
       <PharmacistBar />
