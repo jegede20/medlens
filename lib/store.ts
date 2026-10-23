@@ -37,15 +37,18 @@ function load(): AppData {
   return data;
 }
 
-function commit(next: AppData) {
+/** Saves to the device. Returns false when storage is full or blocked; the app then keeps working in memory. */
+function commit(next: AppData): boolean {
   data = next;
+  let stored = true;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    // Storage full or blocked (private mode). Keep working in memory.
+    stored = false;
   }
   applyDocumentSettings(next.settings);
   listeners.forEach((l) => l());
+  return stored;
 }
 
 /** Mirrors text size / contrast onto <html> so CSS can react. */
@@ -94,13 +97,15 @@ export function medicineKey(r: MedResult) {
   return `${r.registration?.nrn ?? ""}|${r.query.name}|${r.query.strength}|${r.query.form}`.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export function saveMedicine(result: MedResult): SavedMedicine {
+/** Saves (or updates) a medicine. Returns false if the phone could not store it, so the UI never claims a false save. */
+export function saveMedicine(result: MedResult): boolean {
   const cur = load();
   const key = medicineKey(result);
   const existing = cur.medicines.find((m) => medicineKey(m.result) === key);
   const entry: SavedMedicine = { id: existing?.id ?? crypto.randomUUID(), savedAt: Date.now(), result };
-  commit({ ...cur, medicines: [entry, ...cur.medicines.filter((m) => m.id !== entry.id)] });
-  return entry;
+  const ok = commit({ ...cur, medicines: [entry, ...cur.medicines.filter((m) => m.id !== entry.id)] });
+  if (!ok) commit(cur); // roll back the in-memory copy so the list matches what is really stored
+  return ok;
 }
 
 export function removeMedicine(id: string) {

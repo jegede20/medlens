@@ -28,7 +28,7 @@ export default function Landing() {
     <div className="overflow-x-clip">
       {/* Header */}
       <header className="sticky top-3 z-40 mx-auto mt-3 max-w-6xl px-3">
-        <nav className="glass flex items-center justify-between gap-3 rounded-[24px] px-4 py-2.5" aria-label="Main">
+        <nav className="glass flex items-center justify-between gap-3 rounded-[24px] bg-white/90 px-4 py-2.5" aria-label="Main">
           <Link href="/" aria-label="MedLens home">
             <Logo size={36} />
           </Link>

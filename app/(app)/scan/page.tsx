@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { CameraCapture } from "@/components/CameraCapture";
@@ -40,7 +41,7 @@ function Scan() {
   const [picks, setPicks] = useState<Picks>("loading");
   const [product, setProduct] = useState<NafdacProduct | undefined>();
   const [showCheck, setShowCheck] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const photoRef = useRef<string | null>(null);
 
   useEffect(() => () => void (photoRef.current && URL.revokeObjectURL(photoRef.current)), []);
@@ -114,7 +115,7 @@ function Scan() {
     setProduct(product);
     setLookup("loading");
     setShowCheck(false);
-    setSaved(false);
+    setSaveFailed(false);
     go("result");
     const { language, country } = getAppData().settings;
     try {
@@ -318,6 +319,8 @@ function Scan() {
   // Result
   const result = lookup && lookup !== "loading" && lookup.status === "ok" ? lookup.result : null;
   const others = result ? medicines.map((m) => m.result).filter((r) => medicineKey(r) !== medicineKey(result)) : [];
+  // Derived from storage, so a medicine saved earlier shows as saved when it is scanned again.
+  const saved = Boolean(result && medicines.some((m) => medicineKey(m.result) === medicineKey(result)));
   return (
     <div className="mx-auto max-w-[540px]">
       <TopBar title="Your result" step={3} onBack={() => go("confirm")} />
@@ -353,17 +356,18 @@ function Scan() {
               <Icon name="shield" /> Check against my other medicines
             </button>
             {showCheck && result && <InteractionPanel target={result} others={others} />}
-            <button
-              type="button"
-              onClick={() => {
-                saveMedicine(lookup.result);
-                setSaved(true);
-              }}
-              disabled={saved}
-              className="btn btn-outline min-h-14"
-            >
-              <Icon name={saved ? "check" : "plus"} /> {saved ? "Saved to My medicines" : "Save to My medicines"}
-            </button>
+            {saved ? (
+              <Link href="/medicines" className="btn min-h-14 border-[1.5px] border-mint-5 bg-mint-1 text-teal">
+                <Icon name="check" /> Saved to My medicines · View
+              </Link>
+            ) : (
+              <button type="button" onClick={() => setSaveFailed(!saveMedicine(lookup.result))} className="btn btn-outline min-h-14">
+                <Icon name="plus" /> Save to My medicines
+              </button>
+            )}
+            {saveFailed && (
+              <AmberNote icon="warning">This phone could not save the medicine. Its storage may be full, or private browsing may be on.</AmberNote>
+            )}
           </div>
         </ResultView>
       )}

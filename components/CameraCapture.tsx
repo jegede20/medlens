@@ -222,7 +222,7 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
         </div>
       )}
 
-      <div className="mt-6 flex items-start justify-center gap-8">
+      <div className="mx-auto mt-6 grid max-w-sm grid-cols-3 items-start justify-items-center gap-2">
         <RoundControl icon="upload" label="Upload" onClick={() => uploadInput.current?.click()} disabled={Boolean(busy)} />
         <div className="flex flex-col items-center gap-2">
           <button
@@ -236,7 +236,7 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
               <Icon name={mode === "barcode" ? "barcode" : "camera"} size={28} />
             </span>
           </button>
-          <span className="text-[0.9rem] font-bold text-teal">{mode === "barcode" ? "Scan barcode" : "Take photo"}</span>
+          <span className="text-center text-[0.9rem] font-bold leading-tight text-teal">{mode === "barcode" ? "Scan barcode" : "Take photo"}</span>
         </div>
         <RoundControl
           icon={mode === "barcode" ? "camera" : "barcode"}
@@ -257,9 +257,9 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
             placeholder="Or type the numbers under the barcode"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="field flex-1 rounded-full"
+            className="field min-w-0 flex-1 rounded-full"
           />
-          <button type="submit" className="btn glass-teal px-5" disabled={Boolean(busy)}>Look up</button>
+          <button type="submit" className="btn glass-teal shrink-0 px-5" disabled={Boolean(busy)}>Look up</button>
         </form>
       )}
 
@@ -275,7 +275,7 @@ function RoundControl({ icon, label, onClick, disabled }: { icon: "upload" | "ba
       <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className="glass grid size-16 place-items-center rounded-full text-teal disabled:opacity-50">
         <Icon name={icon} size={26} />
       </button>
-      <span className="text-[0.9rem] font-bold text-teal">{label}</span>
+      <span className="text-center text-[0.9rem] font-bold leading-tight text-teal">{label}</span>
     </div>
   );
 }

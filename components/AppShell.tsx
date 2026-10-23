@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Phone bottom tab bar */}
       {showTabs && (
-        <nav aria-label="App" className="glass fixed inset-x-3 bottom-3 z-40 rounded-[28px] bg-white/80 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 nav:hidden">
+        <nav aria-label="App" className="glass fixed inset-x-3 bottom-3 z-40 rounded-[28px] bg-white/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 nav:hidden">
           <ul className="grid grid-cols-5 items-end">
             {[NAV[0], NAV[2], NAV[1], NAV[3], NAV[4]].map((n) =>
               n.href === "/scan" ? (

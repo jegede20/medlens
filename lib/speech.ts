@@ -80,12 +80,13 @@ function chunk(text: string) {
   return out;
 }
 
-export function speak(text: string, id = "default", rate?: number) {
+/** `lang` is the language the text is written in (results shown in label wording are English). */
+export function speak(text: string, id = "default", rate?: number, lang?: string) {
   if (!canSpeak() || !text.trim()) return false;
   const synth = window.speechSynthesis;
   synth.cancel();
   const { settings } = getAppData();
-  const tag = LANG_TAGS[settings.language] ?? "en-US";
+  const tag = LANG_TAGS[lang ?? settings.language] ?? "en-US";
   const voice = pickVoice(tag);
   const pieces = chunk(text);
   setSpeaking(id);

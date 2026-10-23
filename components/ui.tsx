@@ -14,9 +14,11 @@ export function ReadAloud({
   wide = false,
   tone = "glass",
   className = "",
+  lang,
 }: {
   text: string;
   id: string;
+  lang?: string;
   label?: string;
   wide?: boolean;
   tone?: "glass" | "onTeal" | "outline";
@@ -26,7 +28,7 @@ export function ReadAloud({
   const { speak: supported } = useSpeechSupport();
   if (!supported) return null;
   const active = speakingId === id;
-  const toggle = () => (active ? stopSpeaking() : speak(text, id));
+  const toggle = () => (active ? stopSpeaking() : speak(text, id, undefined, lang));
   const toneClass = tone === "onTeal" ? "glass-on-teal" : tone === "outline" ? "btn-outline" : "glass text-teal";
   if (wide) {
     return (

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon, type IconName } from "./Icon";
 import { AmberNote, IconTile, PharmacistBar, ReadAloud, Tag } from "./ui";
 import { getAppData } from "@/lib/store";
-import { listenOnce, speak, useSpeechSupport } from "@/lib/speech";
+import { listenOnce, speak, stopSpeaking, useSpeechSupport } from "@/lib/speech";
 import type { MedResult, NafdacProduct } from "@/lib/types";
 
 const NOT_FOUND = "Not found on the label.";
@@ -77,13 +77,13 @@ function RegistrationCard({ reg }: { reg: NafdacProduct }) {
   );
 }
 
-function Section({ id, icon, tone = "mint", title, speakText, children }: { id: string; icon: IconName; tone?: "mint" | "amber" | "red"; title: string; speakText: string; children: React.ReactNode }) {
+function Section({ id, icon, tone = "mint", title, speakText, lang, children }: { id: string; icon: IconName; tone?: "mint" | "amber" | "red"; title: string; speakText: string; lang: string; children: React.ReactNode }) {
   return (
     <section className="card p-5" aria-labelledby={`${id}-title`}>
       <div className="mb-3 flex items-center gap-3">
         <IconTile icon={icon} tone={tone} size="sm" />
         <h2 id={`${id}-title`} className="flex-1 text-[1.2rem] font-semibold leading-tight text-teal">{title}</h2>
-        <ReadAloud id={id} text={`${title}. ${speakText}`} label={`Read aloud: ${title}`} />
+        <ReadAloud id={id} lang={lang} text={`${title}. ${speakText}`} label={`Read aloud: ${title}`} />
       </div>
       {children}
     </section>
@@ -108,15 +108,14 @@ function Bullets({ items, color = "bg-teal" }: { items: string[]; color?: string
 }
 
 export function ResultView({ result, notice, children }: { result: MedResult; notice?: string; children?: React.ReactNode }) {
-  const autoRead = useRef(false);
   const whole = summaryText(result);
+  const lang = result.language;
 
-  // Voice mode: read the summary aloud as soon as the result appears.
+  // Voice mode: read the summary aloud when the result appears, and stop reading when the user leaves it.
   useEffect(() => {
-    if (autoRead.current) return;
-    autoRead.current = true;
-    if (getAppData().settings.voiceMode) speak(whole, "summary");
-  }, [whole]);
+    if (getAppData().settings.voiceMode) speak(whole, "summary", undefined, lang);
+    return () => stopSpeaking();
+  }, [whole, lang]);
 
   return (
     <div className="space-y-4">
@@ -133,7 +132,7 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
         <p className="relative mt-3 text-[0.88rem] text-white/85">
           {result.source.name === "NAFDAC" ? "Matched product" : "Matched label"}: {result.matchedName}
         </p>
-        <ReadAloud id="summary" text={whole} label="Read the whole summary aloud" wide tone="onTeal" className="relative mt-4 w-full" />
+        <ReadAloud id="summary" lang={lang} text={whole} label="Read the whole summary aloud" wide tone="onTeal" className="relative mt-4 w-full" />
       </div>
 
       {result.registration && <RegistrationCard reg={result.registration} />}
@@ -158,21 +157,21 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
             {result.oneLine === NOT_FOUND ? "Not found on the label. Ask your pharmacist." : result.oneLine}
           </p>
         </div>
-        <ReadAloud id="oneline" text={result.oneLine} label="Read aloud: in one line" />
+        <ReadAloud id="oneline" lang={lang} text={result.oneLine} label="Read aloud: in one line" />
       </section>
 
-      <Section id="what" icon="info" title="What it is for" speakText={result.whatFor.join(" ")}>
+      <Section lang={result.language} id="what" icon="info" title="What it is for" speakText={result.whatFor.join(" ")}>
         <Bullets items={result.whatFor} />
       </Section>
 
-      <Section id="how" icon="pill" title="How the label says to take it" speakText={`${result.howToTake.join(" ")} This is label wording only.`}>
+      <Section lang={result.language} id="how" icon="pill" title="How the label says to take it" speakText={`${result.howToTake.join(" ")} This is label wording only.`}>
         <Bullets items={result.howToTake} />
         <p className="mt-4 rounded-2xl bg-[#F1F3F2] px-4 py-3 text-[0.9rem] text-muted">
           This is label wording only. MedLens does not work out a dose for you.
         </p>
       </Section>
 
-      <Section id="side" icon="warning" tone="amber" title="Possible side effects" speakText={result.sideEffects.map((s) => s.text).join(" ")}>
+      <Section lang={result.language} id="side" icon="warning" tone="amber" title="Possible side effects" speakText={result.sideEffects.map((s) => s.text).join(" ")}>
         <ul className="divide-y divide-line">
           {result.sideEffects.map((s, i) =>
             s.text === NOT_FOUND ? (
@@ -188,6 +187,7 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
       </Section>
 
       <Section
+        lang={result.language}
         id="interactions"
         icon="shield"
         tone="amber"
@@ -216,7 +216,7 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
         <div className="mb-3 flex items-center gap-3">
           <IconTile icon="warning" tone="red" size="sm" />
           <h2 id="help-title" className="flex-1 text-[1.2rem] font-semibold leading-tight text-danger">Get help right away if</h2>
-          <ReadAloud id="help" text={`Get help right away if. ${result.getHelp.join(" ")}`} label="Read aloud: get help right away" />
+          <ReadAloud id="help" lang={lang} text={`Get help right away if. ${result.getHelp.join(" ")}`} label="Read aloud: get help right away" />
         </div>
         <Bullets items={result.getHelp} color="bg-danger" />
         <p className="mt-3 text-[0.9rem] font-bold">In an emergency, call your local emergency number.</p>
