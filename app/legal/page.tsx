@@ -50,7 +50,7 @@ const SECTIONS = [
 export default function LegalPage() {
   return (
     <div className="mx-auto max-w-[720px] px-5 py-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link href="/" aria-label="MedLens home">
           <Logo size={36} />
         </Link>

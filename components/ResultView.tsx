@@ -124,7 +124,7 @@ export function ResultView({ result, notice, children }: { result: MedResult; no
         <span className="absolute right-5 top-5 size-7 rounded-full bg-amber" aria-hidden="true" />
         <div className="relative flex items-center gap-3 pr-8">
           <IconTile icon="pill" tone="teal" />
-          <div>
+          <div className="min-w-0">
             <h2 className="text-[1.5rem] font-bold leading-tight">{medTitle(result)}</h2>
             <p className="text-white/85">{[result.query.form, "Confirmed by you"].filter(Boolean).join(" · ")}</p>
           </div>

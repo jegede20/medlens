@@ -55,11 +55,11 @@ export function PharmacistBar({ text = "Ask your doctor or pharmacist before any
   return (
     <div
       role="note"
-      className={`glass-amber z-30 flex items-center gap-3 rounded-[20px] px-4 py-3 text-[0.95rem] font-bold ${
+      className={`glass-amber z-30 flex items-center gap-3 rounded-[20px] px-4 py-3 text-[min(0.95rem,18px)] font-bold leading-snug ${
         sticky ? "sticky bottom-[calc(var(--tabbar-offset,0px)+12px)] mt-6" : ""
       }`}
     >
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-amber/30">
+      <span className="hidden size-8 shrink-0 place-items-center rounded-full bg-amber/30 min-[380px]:grid">
         <Icon name="info" size={18} />
       </span>
       <span>{text}</span>
@@ -85,7 +85,7 @@ export function TopBar({ title, subtitle, step, onBack, backHref }: { title: str
         <button type="button" onClick={back} aria-label="Go back" className="glass grid size-12 shrink-0 place-items-center rounded-full text-teal">
           <Icon name="back" />
         </button>
-        <div className="flex-1 text-center">
+        <div className="min-w-0 flex-1 text-center">
           <h1 className="text-[1.3rem] font-semibold leading-tight text-teal">{title}</h1>
           {(subtitle || step) && <p className="text-[0.88rem] text-muted">{subtitle ?? `Step ${step} of 3`}</p>}
         </div>

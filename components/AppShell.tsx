@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Phone bottom tab bar */}
       {showTabs && (
-        <nav aria-label="App" className="glass fixed inset-x-3 bottom-3 z-40 rounded-[28px] bg-white/95 px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 nav:hidden">
+        <nav aria-label="App" className="glass fixed inset-x-2 bottom-3 z-40 rounded-[28px] bg-white/95 px-1 min-[380px]:inset-x-3 min-[380px]:px-2 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1.5 nav:hidden">
           <ul className="grid grid-cols-5 items-end">
             {[NAV[0], NAV[2], NAV[1], NAV[3], NAV[4]].map((n) =>
               n.href === "/scan" ? (
@@ -71,15 +71,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </li>
               ) : (
-                <li key={n.href}>
+                <li key={n.href} className="min-w-0">
                   <Link
                     href={n.href}
                     aria-current={isActive(n.href) ? "page" : undefined}
-                    className={`flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl text-[0.72rem] font-bold ${
+                    className={`flex min-h-[min(3.5rem,60px)] flex-col items-center justify-center gap-0.5 whitespace-nowrap rounded-2xl text-[min(0.72rem,3.2vw,13px)] font-bold ${
                       isActive(n.href) ? "text-teal" : "text-muted"
                     }`}
                   >
-                    <span className={`grid h-8 w-12 place-items-center rounded-full ${isActive(n.href) ? "bg-mint-1" : ""}`}>
+                    <span className={`grid h-[min(2rem,34px)] w-full max-w-12 place-items-center rounded-full ${isActive(n.href) ? "bg-mint-1" : ""}`}>
                       <Icon name={n.icon} />
                     </span>
                     {n.short}

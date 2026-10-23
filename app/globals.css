@@ -44,6 +44,13 @@
 html {
   font-size: 112.5%;
 }
+/* Long medicine names must wrap on narrow phones at large text sizes instead of pushing the page sideways. */
+h1,
+h2,
+h3 {
+  overflow-wrap: anywhere;
+}
+
 html[data-size="1"] {
   font-size: 100%;
 }

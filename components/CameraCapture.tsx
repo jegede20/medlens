@@ -230,9 +230,9 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
             onClick={capture}
             disabled={Boolean(busy)}
             aria-label={mode === "barcode" ? "Scan barcode" : "Take photo"}
-            className="grid size-[5.5rem] place-items-center rounded-full border-4 border-teal bg-white disabled:opacity-50"
+            className="grid size-[min(5.5rem,92px)] place-items-center rounded-full border-4 border-teal bg-white disabled:opacity-50"
           >
-            <span className="grid size-[4.25rem] place-items-center rounded-full bg-teal text-white">
+            <span className="grid size-[min(4.25rem,72px)] place-items-center rounded-full bg-teal text-white">
               <Icon name={mode === "barcode" ? "barcode" : "camera"} size={28} />
             </span>
           </button>
@@ -247,7 +247,7 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
       </div>
 
       {mode === "barcode" && (
-        <form onSubmit={submitCode} className="mt-5 flex gap-2">
+        <form onSubmit={submitCode} className="mt-5 flex flex-wrap gap-2">
           <label className="sr-only" htmlFor="barcode-number">Numbers under the barcode</label>
           <input
             id="barcode-number"
@@ -257,9 +257,9 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
             placeholder="Or type the numbers under the barcode"
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="field min-w-0 flex-1 rounded-full"
+            className="field min-w-[min(100%,15rem)] flex-1 rounded-full"
           />
-          <button type="submit" className="btn glass-teal shrink-0 px-5" disabled={Boolean(busy)}>Look up</button>
+          <button type="submit" className="btn glass-teal grow px-5 sm:grow-0" disabled={Boolean(busy)}>Look up</button>
         </form>
       )}
 
@@ -272,7 +272,7 @@ export function CameraCapture({ mock, photoHint, heightClass, tips, showModeSwit
 function RoundControl({ icon, label, onClick, disabled }: { icon: "upload" | "barcode" | "camera"; label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2 pt-3">
-      <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className="glass grid size-16 place-items-center rounded-full text-teal disabled:opacity-50">
+      <button type="button" onClick={onClick} disabled={disabled} aria-label={label} className="glass grid size-[min(4rem,68px)] place-items-center rounded-full text-teal disabled:opacity-50">
         <Icon name={icon} size={26} />
       </button>
       <span className="text-center text-[0.9rem] font-bold leading-tight text-teal">{label}</span>
